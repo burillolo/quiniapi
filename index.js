@@ -71,7 +71,7 @@ app.get('/aciertos', async function  (req, res) {
 
 app.get('/buscaJornada', async function (req, res) {
   try {
-    let partidosJornada = await fechasProximoSorteo().then(async ([fecha, cierre]) => {datos = await buscaPartidos(fecha); return {datos, cierre};});
+    let partidosJornada = await datosProximaJornada();
 	console.log(partidosJornada.datos[0]);
     let datosGuardados = await getLastFile(DIR_INFO_FILES);
     let { partidos, jornada, fecha_sorteo } = partidosJornada.datos[0];
@@ -82,26 +82,25 @@ app.get('/buscaJornada', async function (req, res) {
   catch (error) {
     console.log(error);
     res.status(500);
-	  res.send(`Error en carga de partidos.\n${error.message}`);
+    res.send(`Error en carga de partidos.\n${error.message}`);
   }
 });
 
 app.get('/cargaJornada', async function (req, res) {
   try {
-    let partidosJornada = await fechasProximoSorteo()
-                            .then(async ([fecha, cierre]) => {datos = await buscaPartidos(fecha);  {datos, cierre};});
+    let partidosJornada = await datosProximaJornada();
     console.log({partidosJornada});
-    let { partidos, jornada, fecha_sorteo } = partidosJornada.datos[0];
-    let cierre = partidosJornada.cierre;
-    let { numero, jornadaId: refDB } = await cargaJonada({partidos, numero: jornada, fecha: fecha_sorteo, cierre})
+    let { partidos, jornada } = partidosJornada.datos[0];
+    let { cierre, fecha } = partidosJornada;
+    let { numero, jornadaId: refDB } = await cargaJonada({partidos, numero: jornada, fecha, cierre})
                                               .then(cargadas => cargadas.find(jrd => (jrd.grupoId === REF_DB_GROUP_ID)));
-    escribeDatosFichero({numero, partidos, refDB, cierre});
+    escribeDatosFichero({numero, partidos, refDB, fecha, cierre}, fecha);
     res.send(partidos)
   }
   catch (error) {
     console.log(error);
     res.status(500);
-	  res.send(`Error en carga de partidos.\n${error.message}`);
+    res.send(`Error en carga de partidos.\n${error.message}`);
   }
 });
 
@@ -211,6 +210,14 @@ async function getLastFile(dir) {
       })
     }
   ).then(path => loadJsonFromFile(path));
+}
+
+async function datosProximaJornada() {
+	return fechasProximoSorteo()
+		.then(async ([fecha, cierre]) => {
+			datos = await buscaPartidos(fecha);
+			return {datos, fecha, cierre};
+		  });
 }
 
 async function fechasProximoSorteo() {
