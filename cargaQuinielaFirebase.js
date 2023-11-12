@@ -51,3 +51,33 @@ async function guardaJornadaDB(db, idPartidos, numeroJornada) {
 }
 
 exports.cargaJonada = cargaJonada;
+
+exports.getPronosticosJugadores = async (fechaIni, fechaFin) => {
+  const updatesRef = db.collection('peñas');
+  const peniasDocuments = await updatesRef.listDocuments();
+  const jornadasCollections = db.collection('jornadas');
+  const pronosticosJugadores = await jornadasCollections
+    .where('inicio', '>=', Timestamp.fromDate(fechaIni))
+    .where('inicio', '<=', Timestamp.fromDate(fechaFin)).get().then(querySnapshot => {
+      let docs = querySnapshot.docs;
+      return Promise.all(docs.flatMap((documentSnapshot) => {
+        try {
+        
+          return peniasDocuments.map((doc) => {
+            return doc.collection('jornadas').where('partidos', '==', documentSnapshot.ref).get().then(querySnapshot => {
+              let docs = querySnapshot.docs;
+              return docs.map(docJugadoresSnapshot => {
+                const {quinielas, numero} = docJugadoresSnapshot.data();
+                const {inicio} = documentSnapshot.data();
+                return {quinielas, fecha: inicio.toDate(), numero};
+              });
+            })
+          })
+        } catch (err) {
+          console.log(err);
+          return "ERROR"
+        }
+    }));
+  });
+  return pronosticosJugadores.flat();
+} 

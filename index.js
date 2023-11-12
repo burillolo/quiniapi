@@ -6,6 +6,7 @@ const enviaWhatsapp = require('./enviarWhatsapp');
 const { yearWeekIndex } = require('./weekYearUtils');
 const { escribeDatosFichero, loadJsonFromFile } = require('./fileStoreManager.js')
 const express = require('express');
+const moment = require('moment');
 
 const DIR_INFO_FILES = '.';
 const app_info = require(`${DIR_INFO_FILES}/info_app.json`);
@@ -59,7 +60,8 @@ app.get('/info', async (req, res) => {
 
 app.get('/aciertos', async function  (req, res) {
   try {
-	  let aciertos = await buscaResultados.muestraAciertos();
+    const fechaJornada = (req.query.inicio) ?  parseQueryParam(req.query.inicio) : new Date();
+	  let aciertos = await buscaResultados.muestraAciertos(fechaJornada);
 	  res.send(aciertos);
   }
   catch (error) {
@@ -132,7 +134,7 @@ app.get('/enviaNotificacion/:notificacion', async function  (req, res) {
     res.send("No hay información para enviar, por favor cargue datos");
 	  return;
   }
-  let info = ((tipo, storedInfo) => {
+  let info = await (async (tipo, storedInfo) => {
     switch (tipo) {
       case 'url':
         return  {appUrl: app_info.url, grupoUrl: REF_DB_GROUP_ID, jornadaUrl: storedInfo.refDB};
@@ -141,17 +143,21 @@ app.get('/enviaNotificacion/:notificacion', async function  (req, res) {
         const turnos = app_info.turnos;
         return {siguiente, turnos};
       case 'cierre':
-        return {cierre: new Date(storedInfo.cierre)};
+        return {cierre: new Date(storedInfo.cierre)};  
+      case 'aciertos':
+        const fechaJornada = (req.query.fecha) ?  parseQueryParam(req.query.fecha) : new Date();
+        const aciertos = await buscaResultados.muestraAciertos(fechaJornada);
+        return aciertos; 
       default:
         return storedInfo;
     }
   })(notificacion, storedInfo);
-  console.log(info);
   let envioParams = {
     tipo: notificacion,
     mensaje: mensajeNotificacion(notificacion, info),
-    info: (notificacion == "aciertos") ? (await buscaResultados.muestraAciertos()) : info
+    info
   }
+  console.dir(envioParams);
   if ((req.query.canal ?? 'whatsapp') === 'whatsapp') {
     try {
       if (!waClient) waClient = await enviaWhatsapp.createClient();
@@ -185,6 +191,18 @@ app.post('/guardaJugada', async (req, res) => {
 	  res.send(err);
 	}
 });
+
+app.get('/pronosticosJugadores', (req, res) => {
+  const inicio = (req.query.inicio) ?  parseQueryParam(req.query.inicio) : undefined;
+  const fin = (req.query.fin) ? parseQueryParam(req.query.fin) : undefined;
+  buscaResultados.aciertosJugadores(inicio, fin).then(quinielas => {
+    res.send(JSON.stringify(quinielas));
+  });
+});
+
+function parseQueryParam(param) {
+  return moment(param, "YYYYMMDD").toDate();
+}
 
 const port = process.env.PORT || 8000;
 app.listen(port, function () {
