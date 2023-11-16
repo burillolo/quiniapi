@@ -23,7 +23,7 @@ const muestraAciertos = async (fechaBusqueda) => {
   if (!jugadas?.length) throw new Error("No se ha encontrado jugada para esta jornada");
   const data = resultados.reduce((acc, e, i) => {
     let listaApuesta = jugadas[i];
-    let resultadoRespuesta =  e.signo;
+    let resultadoRespuesta =  (e.signo ?? '?').trim();
     let numPartido = i+1;
     let finalizado =  !!resultadoRespuesta;//(numPartido<15 && OPCIONES_QUINIELA.includes(resultadoRespuesta)) || (numPartido>=15 && /[0-2M]-[0-2M]/.test(resultadoRespuesta));
     let acertado = finalizado &&  ((numPartido<15 && listaApuesta.includes(resultadoRespuesta)) || (numPartido>=15 && resultadoRespuesta === jugadas[i]));

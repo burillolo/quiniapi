@@ -60,7 +60,7 @@ app.get('/info', async (req, res) => {
 
 app.get('/aciertos', async function  (req, res) {
   try {
-    const fechaJornada = (req.query.inicio) ?  parseQueryParam(req.query.inicio) : new Date();
+    const fechaJornada = (req.query.fecha) ?  parseQueryParam(req.query.fecha) : new Date();
 	  let aciertos = await buscaResultados.muestraAciertos(fechaJornada);
 	  res.send(aciertos);
   }
@@ -196,7 +196,8 @@ app.get('/pronosticosJugadores', (req, res) => {
   const inicio = (req.query.inicio) ?  parseQueryParam(req.query.inicio) : undefined;
   const fin = (req.query.fin) ? parseQueryParam(req.query.fin) : undefined;
   buscaResultados.aciertosJugadores(inicio, fin).then(quinielas => {
-    res.send(JSON.stringify(quinielas));
+    const result = quinielas.map((e) => ({fechaJornada: e.fechaJornada, quinielas: e.aciertosJugadores.sort((a,b) => (b.aciertos -a.aciertos))}));
+    res.send(JSON.stringify(result));
   });
 });
 
