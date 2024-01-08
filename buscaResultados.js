@@ -1,4 +1,4 @@
-const { buscaPartidos } = require('./loterias-api');
+const { buscaPartidos, buscaResultados } = require('./loterias-api');
 const { yearWeekIndex } = require('./weekYearUtils');
 const { loadJsonFromFile } = require('./fileStoreManager');
 const { getPronosticosJugadores } = require('./cargaQuinielaFirebase');
@@ -7,9 +7,9 @@ const fs = require('fs');
 
 const OPCIONES_QUINIELA = ['1', 'X', '2'];
 
-const muestraAciertos = async (fechaBusqueda) => {
+exports.muestraAciertos = async (fechaBusqueda) => {
   const fechaJornada = aDiaJornada(fechaBusqueda);
-  const datosJornada = await buscaPartidos(fechaJornada).then(resultados => (resultados[0])); 
+  const datosJornada = await buscaResultados(fechaJornada).then(resultados => (resultados[0])); 
   const resultados = datosJornada.partidos;
   const numeroJornada = datosJornada.jornada;
   console.log({numeroJornada, fecha: datosJornada.fecha_sorteo});
@@ -23,9 +23,9 @@ const muestraAciertos = async (fechaBusqueda) => {
   if (!jugadas?.length) throw new Error("No se ha encontrado jugada para esta jornada");
   const data = resultados.reduce((acc, e, i) => {
     let listaApuesta = jugadas[i];
-    let resultadoRespuesta =  (e.signo ?? '?').trim();
+    let resultadoRespuesta =  (e.signo ?? '?').trim().toUpperCase();
     let numPartido = i+1;
-    let finalizado =  !!resultadoRespuesta;//(numPartido<15 && OPCIONES_QUINIELA.includes(resultadoRespuesta)) || (numPartido>=15 && /[0-2M]-[0-2M]/.test(resultadoRespuesta));
+    let finalizado =  !!e.signo;//(numPartido<15 && OPCIONES_QUINIELA.includes(resultadoRespuesta)) || (numPartido>=15 && /[0-2M]-[0-2M]/.test(resultadoRespuesta));
     let acertado = finalizado &&  ((numPartido<15 && listaApuesta.includes(resultadoRespuesta)) || (numPartido>=15 && resultadoRespuesta === jugadas[i]));
     let o = {
       partido: `${e.local} - ${e.visitante}`,
@@ -46,8 +46,6 @@ const muestraAciertos = async (fechaBusqueda) => {
   return {...data, numeroJornada, fechaJornada};
 };
 
-exports.muestraAciertos = muestraAciertos;
-
 const aciertosJugadores = (fechaDesde, fechaHasta) => {
   return getPronosticosJugadores(fechaDesde ?? aDiaJornadaAnterior(), fechaHasta ?? moment(aDiaJornadaAnterior()).endOf('day').toDate())
     .then(jornadasJugadores => (Promise.all(jornadasJugadores.map(j => (compruebaJornadaJugadores(j))))));
@@ -57,7 +55,7 @@ exports.aciertosJugadores = aciertosJugadores;
 
 async function compruebaJornadaJugadores(jornada) {
   const fechaJornada = aDiaJornada(jornada.fecha);
-  const resultados = await buscaPartidos(fechaJornada).then(resultados => (resultados[0].partidos.map(p => (p.signo.trim()))));
+  const resultados = await buscaPartidos(fechaJornada).then(resultados => (resultados[0].partidos.map(p => ((p.signo ?? '?').trim()))));
   const aciertosJugadores = Object.entries(jornada.quinielas)
           .map(([nombre, apuestas])=> ({nombre, aciertos: apuestas
             .map((a,i) => ((a==((resultados?.length ?? -1 > i) ? resultados[i] : '?')) ? 1 : 0))

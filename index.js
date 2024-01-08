@@ -97,7 +97,7 @@ app.get('/cargaJornada', async function (req, res) {
     let { numero, jornadaId: refDB } = await cargaJonada({partidos, numero: jornada, fecha, cierre})
                                               .then(cargadas => cargadas.find(jrd => (jrd.grupoId === REF_DB_GROUP_ID)));
     escribeDatosFichero({numero, partidos, refDB, fecha, cierre}, fecha);
-    res.send(partidos)
+    res.send({numero, partidos, refDB})
   }
   catch (error) {
     console.log(error);
@@ -157,7 +157,7 @@ app.get('/enviaNotificacion/:notificacion', async function  (req, res) {
     mensaje: mensajeNotificacion(notificacion, info),
     info
   }
-  console.dir(envioParams);
+  console.dir(envioParams, {depth: 4});
   if ((req.query.canal ?? 'whatsapp') === 'whatsapp') {
     try {
       if (!waClient) waClient = await enviaWhatsapp.createClient();
@@ -197,6 +197,7 @@ app.get('/pronosticosJugadores', (req, res) => {
   const fin = (req.query.fin) ? parseQueryParam(req.query.fin) : undefined;
   buscaResultados.aciertosJugadores(inicio, fin).then(quinielas => {
     const result = quinielas.map((e) => ({fechaJornada: e.fechaJornada, quinielas: e.aciertosJugadores.sort((a,b) => (b.aciertos -a.aciertos))}));
+    result.forEach(e => {console.log(`Aciertos en ${e.fechaJornada}:`); console.table(e.quinielas)});
     res.send(JSON.stringify(result));
   });
 });
@@ -204,6 +205,57 @@ app.get('/pronosticosJugadores', (req, res) => {
 function parseQueryParam(param) {
   return moment(param, "YYYYMMDD").toDate();
 }
+
+app.get('/pronosticosJugadores/:semana', function  (req, res) {
+  
+  const semanaanio = req.params.semana;
+  const [anio, semana] = semanaanio.split('-W').map(n => (Number(n)));
+  if (!(anio && semana)) {
+    res.status(404).send(JSON.stringify({message: "Parametro semana con formato incorrecto."}));
+    return;
+  }
+  
+  const [inicio, fin] = anioSemanaToInicioFin(anio, semana);
+  
+  buscaResultados.aciertosJugadores(inicio, fin).then(quinielas => {
+    const result = quinielas.map((e) => ({fechaJornada: e.fechaJornada, quinielas: e.aciertosJugadores.sort((a,b) => (b.aciertos -a.aciertos))}));
+    result.forEach(e => {console.log(`Aciertos en ${e.fechaJornada}:`); console.table(e.quinielas)});
+    res.send(JSON.stringify(result[0]));
+  });
+});
+
+app.get('/informeJornada/:semana', (req, res) => {
+
+  const semanaanio = req.params.semana;
+  const [anio, semana] = semanaanio.split('-W').map(n => (Number(n)));
+  if (!(anio && semana)) {
+    res.status(404).send(JSON.stringify({message: "Parametro semana con formato incorrecto."}));
+    return;
+  }
+  
+  const [inicio, fin] = anioSemanaToInicioFin(anio, semana);
+  
+  const buscaAciertosJugadores = buscaResultados.aciertosJugadores(inicio, fin).then(quinielas => {
+    const result = quinielas.map((e) => ({fechaJornada: e.fechaJornada, quinielas: e.aciertosJugadores.sort((a,b) => (b.aciertos -a.aciertos))}));
+    return result[0].quinielas;
+  });
+  const buscaResultadosPromise = buscaResultados.muestraAciertos(fin);
+  Promise.all([buscaAciertosJugadores, buscaResultadosPromise]).then((values) => {
+	console.log(values);
+	const [aciertosJugadores, resultados] = values;
+    res.send(JSON.stringify({aciertosJugadores, resultados}));
+  })
+  .catch(e => {
+	  console.log(e);
+	  res.status(404).send(JSON.stringify({message: e.message}))
+    });
+});
+
+// Handling non matching request from the client 
+app.use((req, res, next) => {
+    const error = "Not found";
+    res.status(404).send({error}); 
+});
 
 const port = process.env.PORT || 8000;
 app.listen(port, function () {
@@ -264,4 +316,10 @@ function mensajeCierre(fechaCierre) {
   const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', 
   hour: "numeric", minute: "numeric" };
   return `Cierre de ventas: ${fechaCierre.toLocaleDateString('es-ES', options)}`;
+}
+
+function anioSemanaToInicioFin(anio, semana) {
+  const inicio = moment(`${anio}`).add(semana-1, 'weeks').day("Friday").toDate();
+  const fin = moment(`${anio}`).add(semana, 'weeks').startOf('week').toDate();
+  return [inicio, fin];
 }

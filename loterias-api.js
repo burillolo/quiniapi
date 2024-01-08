@@ -33,11 +33,19 @@ exports.buscaProximoSorteo = () => {
   return fetchData(`${LOTERIAS_API_URL}/proximosv3?game_id=${QUINIELA_GAME_ID}&num=2`).then(s => {console.log(s); return s;});
 }
 
+exports.buscaResultados = (fechaSorteo) => {
+  
+  const [mes, dia, anio] = [Number(fechaSorteo.getMonth()+1).toString().padStart(2, '0'),
+                            Number(fechaSorteo.getDate()).toString().padStart(2, '0'),
+                            fechaSorteo.getFullYear()];
+  return fetchData(`${LOTERIAS_API_URL}/buscadorSorteos?game_id=${QUINIELA_GAME_ID}&celebrados=true&fechaInicioInclusiva=${anio}${mes}${dia}&fechaFinInclusiva=${anio}${mes}${dia}`);
+}
+
 function fetchData(url) {
   return fetch(url, {
     "headers": HEADER_CHROME,
     "body": null,
     "method": "GET"
   })
-  .then((res)=> res.json())
+  .then((res)=> res.json());
 }

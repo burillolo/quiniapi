@@ -53,6 +53,7 @@ async function guardaJornadaDB(db, idPartidos, numeroJornada) {
 exports.cargaJonada = cargaJonada;
 
 exports.getPronosticosJugadores = async (fechaIni, fechaFin) => {
+  console.log(`Buscando desde ${fechaIni} hasta ${fechaFin}`);
   const updatesRef = db.collection('peñas');
   const peniasDocuments = await updatesRef.listDocuments();
   const jornadasCollections = db.collection('jornadas');
